@@ -5,8 +5,6 @@ const dotenv = require("dotenv");
 const path = require("path");
 const helmet = require("helmet");
 const morgan = require("morgan");
-const http = require("http");
-const WebSocket = require("ws");
 const rateLimit = require("express-rate-limit");
 
 dotenv.config();
@@ -19,13 +17,6 @@ const orderRoutes = require("./routes/orderRoutes");
 const paymentRoutes = require("./routes/paymentRoutes");
 
 const app = express();
-const server = http.createServer(app);
-
-// WebSocket Server
-const wss = new WebSocket.Server({ server });
-
-// Store client connections with user mapping
-const clients = new Map();
 
 // Security middleware
 app.use(
@@ -69,101 +60,33 @@ if (process.env.NODE_ENV !== "production") {
   app.use(morgan("combined"));
 }
 
-// Body parsing middleware - Special handling for webhook
-app.use(
-  "/api/payment/stripe/webhook",
-  express.raw({ type: "application/json" })
-);
-
-// Regular body parsing middleware
+// Body parsing middleware
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 
 // Static files
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
-// WebSocket connection handler
-wss.on("connection", (ws, req) => {
-  console.log("New WebSocket client connected");
+// MongoDB connection (with error handling for serverless)
+if (process.env.MONGODB_URI) {
+  mongoose
+    .connect(process.env.MONGODB_URI, {
+      useNewUrlParser: true,
+      useUnifiedTopology: true,
+      serverSelectionTimeoutMS: 5000,
+      socketTimeoutMS: 45000,
+    })
+    .then(() => console.log("MongoDB connected successfully"))
+    .catch((err) => {
+      console.error("MongoDB connection error:", err);
+    });
+}
 
-  ws.isAlive = true;
-  ws.on("pong", () => {
-    ws.isAlive = true;
-  });
-
-  // Handle client authentication and messages
-  ws.on("message", (message) => {
-    try {
-      const data = JSON.parse(message);
-
-      if (data.type === "authenticate" && data.userId) {
-        // Map user ID to WebSocket connection
-        clients.set(data.userId, ws);
-        ws.userId = data.userId;
-        console.log(`User ${data.userId} authenticated for real-time updates`);
-
-        ws.send(
-          JSON.stringify({
-            type: "authenticated",
-            message: "Connected to real-time payment updates",
-          })
-        );
-      }
-    } catch (error) {
-      console.error("WebSocket message error:", error);
-    }
-  });
-
-  ws.on("close", () => {
-    // Remove client from map when disconnected
-    if (ws.userId) {
-      clients.delete(ws.userId);
-      console.log(`User ${ws.userId} disconnected from real-time updates`);
-    }
-  });
-
-  ws.on("error", (error) => {
-    console.error("WebSocket connection error:", error);
-  });
-});
-
-// Heartbeat to keep connections alive
-const interval = setInterval(() => {
-  wss.clients.forEach((ws) => {
-    if (ws.isAlive === false) return ws.terminate();
-
-    ws.isAlive = false;
-    ws.ping();
-  });
-}, 30000);
-
-wss.on("close", () => {
-  clearInterval(interval);
-});
-
-// Function to broadcast payment updates to specific user
-const broadcastPaymentUpdate = (userId, paymentData) => {
-  const client = clients.get(userId);
-  if (client && client.readyState === WebSocket.OPEN) {
-    client.send(
-      JSON.stringify({
-        type: "payment_update",
-        data: paymentData,
-      })
-    );
-    console.log(`Payment update sent to user ${userId}:`, paymentData.status);
-  }
-};
-
-// Make broadcast function available globally
-global.broadcastPaymentUpdate = broadcastPaymentUpdate;
-
-// Health check endpoint (before other routes)
+// Health check endpoint
 app.get("/api/health", (req, res) => {
   res.json({
     success: true,
-    message: "Server is running with WebSocket support",
-    connectedClients: clients.size,
+    message: "Server is running on Vercel",
     timestamp: new Date().toISOString(),
     environment: process.env.NODE_ENV || "development",
   });
@@ -184,21 +107,6 @@ app.use("/api/*", (req, res) => {
   });
 });
 
-// MongoDB connection
-mongoose
-  .connect(
-    process.env.MONGODB_URI || "mongodb://localhost:27017/ecommerce-clothing",
-    {
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
-    }
-  )
-  .then(() => console.log("MongoDB connected successfully"))
-  .catch((err) => {
-    console.error("MongoDB connection error:", err);
-    process.exit(1);
-  });
-
 // Global error handling middleware
 app.use((error, req, res, next) => {
   console.error("Global error handler:", error);
@@ -215,26 +123,13 @@ app.use((error, req, res, next) => {
   });
 });
 
-// Handle unhandled promise rejections
-process.on("unhandledRejection", (err) => {
-  console.error("Unhandled Promise Rejection:", err);
-  server.close(() => {
-    process.exit(1);
+// For local development
+if (process.env.NODE_ENV !== "production") {
+  const PORT = process.env.PORT || 5000;
+  app.listen(PORT, () => {
+    console.log(`🚀 Server running on port ${PORT}`);
   });
-});
+}
 
-// Handle uncaught exceptions
-process.on("uncaughtException", (err) => {
-  console.error("Uncaught Exception:", err);
-  process.exit(1);
-});
-
-const PORT = process.env.PORT || 5000;
-server.listen(PORT, () => {
-  console.log(`🚀 Server running on port ${PORT}`);
-  console.log(`📡 WebSocket server ready for real-time updates`);
-  console.log(`🌍 Environment: ${process.env.NODE_ENV || "development"}`);
-  console.log(`✅ CORS enabled for all origins`);
-});
-
-module.exports = { app };
+// Export the Express app for Vercel
+module.exports = app;
