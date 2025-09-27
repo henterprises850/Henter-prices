@@ -237,4 +237,4 @@ server.listen(PORT, () => {
   console.log(`✅ CORS enabled for all origins`);
 });
 
-module.exports = { app, server, wss };
+module.exports = { app };
