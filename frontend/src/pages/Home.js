@@ -237,7 +237,7 @@ const Home = () => {
       </section>
 
       {/* Newsletter Section */}
-      <section className="py-16 bg-primary-600 text-white">
+      {/* <section className="py-16 bg-primary-600 text-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center">
             <h2 className="text-3xl font-bold mb-4">Stay Updated</h2>
@@ -256,7 +256,7 @@ const Home = () => {
             </div>
           </div>
         </div>
-      </section>
+      </section> */}
     </div>
   );
 };

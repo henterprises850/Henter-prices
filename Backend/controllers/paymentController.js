@@ -191,9 +191,80 @@ const getPaymentStatus = async (req, res) => {
   }
 };
 
+const ProcessGooglePay = async (req, res) => {
+  try {
+    const { paymentData, amount } = req.body;
+
+    // Extract the payment token from Google Pay data
+    const paymentToken = paymentData.paymentMethodData.tokenizationData.token;
+
+    // Parse the token (this varies by payment processor)
+    const token = JSON.parse(paymentToken);
+
+    // Create payment intent with Stripe
+    const paymentIntent = await stripe.paymentIntents.create({
+      amount: Math.round(amount * 100), // Convert to cents
+      currency: "usd",
+      payment_method_data: {
+        type: "card",
+        card: {
+          token: token.id, // Use the token from Google Pay
+        },
+      },
+      confirmation_method: "manual",
+      confirm: true,
+      return_url: "https://your-website.com/return",
+    });
+
+    if (paymentIntent.status === "succeeded") {
+      // Payment successful
+      res.json({
+        success: true,
+        paymentIntentId: paymentIntent.id,
+        message: "Payment processed successfully",
+      });
+    } else {
+      // Payment requires additional action
+      res.json({
+        success: false,
+        error: "Payment requires additional authentication",
+        paymentIntent: paymentIntent,
+      });
+    }
+  } catch (error) {
+    console.error("Payment processing error:", error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+};
+
+const CreatePaymentIntent = async (req, res) => {
+  try {
+    const { amount } = req.body;
+
+    const paymentIntent = await stripe.paymentIntents.create({
+      amount: Math.round(amount * 100),
+      currency: "usd",
+      payment_method_types: ["card"],
+    });
+
+    res.json({
+      clientSecret: paymentIntent.client_secret,
+    });
+  } catch (error) {
+    res.status(500).json({
+      error: error.message,
+    });
+  }
+};
+
 module.exports = {
   createRazorpayOrder,
   verifyRazorpayPayment,
   createPhonePeOrder,
   getPaymentStatus,
+  ProcessGooglePay,
+  CreatePaymentIntent
 };

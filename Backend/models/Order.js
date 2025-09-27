@@ -36,53 +36,56 @@ const orderSchema = new mongoose.Schema(
       state: { type: String, required: true },
       phone: { type: String, required: true },
     },
+    totalPrice: { type: Number, required: true, min: 0 },
+    shippingPrice: { type: Number, default: 0, min: 0 },
+    taxPrice: { type: Number, default: 0, min: 0 },
+
+    // UPI Payment Fields
+    upiTransactionId: { type: String },
+    upiId: { type: String },
+    paymentConfirmationType: {
+      type: String,
+      enum: ["auto", "manual", "webhook"],
+      default: "manual",
+    },
+
+    // General Payment Fields
+    paymentId: { type: String },
+    paidAt: { type: Date },
+    failureReason: { type: String },
+    cancellationReason: { type: String },
+    cancelledAt: { type: Date },
     paymentMethod: {
       type: String,
       required: true,
-      enum: ["COD", "Online"],
+      enum: ["COD", "UPI", "Online", "GooglePay", "MockRazorpay", "CASHFREE"],
     },
-    paymentResult: {
-      id: String,
-      status: String,
-      updateTime: String,
-      emailAddress: String,
+    paymentStatus: {
+      type: String,
+      default: "pending",
+      enum: ["pending", "processing", "completed", "failed", "cancelled"],
     },
-    totalPrice: {
-      type: Number,
-      required: true,
-      default: 0,
-    },
-    shippingPrice: {
-      type: Number,
-      required: true,
-      default: 0,
-    },
-    taxPrice: {
-      type: Number,
-      required: true,
-      default: 0,
-    },
-    isPaid: {
-      type: Boolean,
-      default: false,
-    },
-    paidAt: Date,
-    isDelivered: {
-      type: Boolean,
-      default: false,
-    },
-    deliveredAt: Date,
     orderStatus: {
       type: String,
+      default: "pending",
       enum: [
+        "pending",
+        "confirmed",
+        "processing",
+        "shipped",
+        "delivered",
+        "cancelled",
         "Order Placed",
-        "Packing",
-        "Shipped",
-        "Out for Delivery",
-        "Delivered",
       ],
-      default: "Order Placed",
     },
+    // Cashfree specific fields
+    cashfreeOrderId: String,
+    paymentSessionId: String,
+    cashfreePaymentId: String,
+    cashfreeTransactionId: String,
+    // Timestamps
+    createdAt: { type: Date, default: Date.now },
+    updatedAt: { type: Date, default: Date.now },
   },
   {
     timestamps: true,

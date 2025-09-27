@@ -22,7 +22,7 @@ import Register from "./pages/Register";
 import Profile from "./pages/Profile";
 import Orders from "./pages/Orders";
 import OrderSuccess from "./pages/OrderSuccess";
-
+import AdminProducts from "./pages/admin/AdminProducts"; // Add this import
 // Styles
 import "./styles/global.css";
 
@@ -48,6 +48,8 @@ function App() {
                   path="/order-success/:orderId"
                   element={<OrderSuccess />}
                 />
+                {/* Admin Routes */}
+                <Route path="/admin/products" element={<AdminProducts />} />
               </Routes>
             </main>
             <Footer />

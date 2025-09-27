@@ -107,7 +107,7 @@ const Login = () => {
             </div>
           </div>
 
-          <div className="flex items-center justify-between">
+          {/* <div className="flex items-center justify-between">
             <div className="text-sm">
               <Link
                 to="/forgot-password"
@@ -116,7 +116,7 @@ const Login = () => {
                 Forgot your password?
               </Link>
             </div>
-          </div>
+          </div> */}
 
           <div>
             <button
