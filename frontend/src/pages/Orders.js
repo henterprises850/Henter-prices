@@ -211,7 +211,6 @@ const Orders = () => {
                     </p>
                     <p className="text-sm text-gray-600">
                       {order.paymentMethod}{" "}
-                      {order.isPaid ? "(Paid)" : "(Pending)"}
                     </p>
                   </div>
                 </div>
@@ -260,32 +259,6 @@ const Orders = () => {
                       {order.shippingAddress.pincode}
                     </p>
                     <p>Phone: {order.shippingAddress.phone}</p>
-                  </div>
-                </div>
-
-                {/* Order Actions */}
-                <div className="mt-6 pt-6 border-t border-gray-200 flex flex-col sm:flex-row sm:justify-between sm:items-center">
-                  <div className="text-sm text-gray-600">
-                    Payment: {order.paymentMethod}
-                    {order.paymentResult?.mockPayment && (
-                      <span className="ml-2 text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
-                        Mock Payment
-                      </span>
-                    )}
-                  </div>
-                  <div className="mt-4 sm:mt-0 flex space-x-3">
-                    <Link
-                      to={`/order/${order._id}`}
-                      className="bg-primary-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-primary-700 transition-colors inline-flex items-center"
-                    >
-                      <FiEye className="mr-1 h-4 w-4" />
-                      View Details
-                    </Link>
-                    {order.orderStatus === "Delivered" && (
-                      <button className="bg-gray-200 text-gray-800 px-4 py-2 rounded-md text-sm font-medium hover:bg-gray-300 transition-colors">
-                        Reorder
-                      </button>
-                    )}
                   </div>
                 </div>
               </div>
