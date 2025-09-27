@@ -27,30 +27,6 @@ const wss = new WebSocket.Server({ server });
 // Store client connections with user mapping
 const clients = new Map();
 
-// CORS Configuration - Handle multiple origins
-const allowedOrigins = [
-  "http://localhost:3000",
-  "http://localhost:3001",
-  "https://clothselling.netlify.app",
-  process.env.FRONTEND_URL,
-].filter(Boolean); // Remove any undefined values
-
-const corsOptions = {
-  origin: function (origin, callback) {
-    // Allow requests with no origin (like mobile apps or curl requests)
-    if (!origin) return callback(null, true);
-
-    if (allowedOrigins.indexOf(origin) !== -1) {
-      callback(null, true);
-    } else {
-      callback(new Error("Not allowed by CORS"));
-    }
-  },
-  credentials: true,
-  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization"],
-};
-
 // Security middleware
 app.use(
   helmet({
@@ -66,11 +42,15 @@ app.use(
   })
 );
 
-// CORS middleware (single instance)
-app.use(cors(corsOptions));
-
-// Preflight handler for all routes
-app.options("*", cors(corsOptions));
+// Simple CORS - Allow all origins
+app.use(
+  cors({
+    origin: "*",
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+  })
+);
 
 // Rate limiting
 const limiter = rateLimit({
@@ -254,7 +234,7 @@ server.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
   console.log(`📡 WebSocket server ready for real-time updates`);
   console.log(`🌍 Environment: ${process.env.NODE_ENV || "development"}`);
-  console.log(`✅ CORS enabled for origins: ${allowedOrigins.join(", ")}`);
+  console.log(`✅ CORS enabled for all origins`);
 });
 
 module.exports = { app, server, wss };
