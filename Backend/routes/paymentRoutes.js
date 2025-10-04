@@ -200,6 +200,8 @@ router.get("/cashfree/verify/:orderId", protect, async (req, res) => {
         (payment) => payment.payment_status === "SUCCESS"
       );
 
+      console.log("Verifying payment for order:", orderId, paymentsResponse);
+
       if (successfulPayment) {
         paymentStatus = "SUCCESS";
         paymentDetails = successfulPayment;

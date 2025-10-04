@@ -54,8 +54,10 @@ const Checkout = () => {
 
   const calculateTotal = () => {
     const subtotal = getCartTotal();
-    const shipping = subtotal > 999 ? 0 : 99;
-    const tax = Math.round(subtotal * 0.18);
+    // const shipping = subtotal > 999 ? 0 : 99;
+    // const tax = Math.round(subtotal * 0.18);
+    const shipping = 0;
+    const tax = 0;
     const total = subtotal + shipping + tax;
     return { subtotal, shipping, tax, total };
   };
@@ -172,7 +174,7 @@ const Checkout = () => {
     }
   };
 
-  // Verify payment status
+  // Verify payment status - UPDATED TO REDIRECT TO HOME PAGE
   const verifyPayment = async (orderId) => {
     try {
       setLoading(true);
@@ -192,16 +194,33 @@ const Checkout = () => {
 
         if (paymentStatus === "SUCCESS") {
           clearCart();
-          toast.success("Payment successful! Order confirmed.");
-          navigate(`/order-success/${orderId}`);
+          // Show success message with order details
+          toast.success(
+            `🎉 Payment successful! Order #${orderId.slice(
+              -8
+            )} confirmed. Redirecting to home...`,
+            {
+              autoClose: 3000,
+            }
+          );
+
+          // Redirect to home page after a short delay to show the success message
+          setTimeout(() => {
+            navigate("/");
+          }, 3000);
         } else if (paymentStatus === "PENDING") {
           toast.warning(
             "Payment is being processed. You'll receive confirmation shortly."
           );
-          navigate(`/order-pending/${orderId}`);
+          // Optional: You can also redirect to home for pending payments
+          setTimeout(() => {
+            navigate("/");
+          }, 2000);
         } else {
           toast.error("Payment failed or was cancelled.");
-          navigate(`/order-failed/${orderId}`);
+          // Stay on checkout page for failed payments
+          // Or redirect to home if you prefer
+          // navigate("/");
         }
       } else {
         toast.error("Payment verification failed");
@@ -235,7 +254,7 @@ const Checkout = () => {
     }
   };
 
-  // COD Order Handler (unchanged)
+  // COD Order Handler - ALSO UPDATED TO REDIRECT TO HOME PAGE
   const handleCODOrder = async () => {
     try {
       if (!validateShippingAddress()) {
@@ -272,8 +291,20 @@ const Checkout = () => {
       );
 
       clearCart();
-      toast.success("Order placed successfully!");
-      navigate(`/order-success/${response.data.order._id}`);
+      // Show success message for COD orders
+      toast.success(
+        `🎉 Order placed successfully! Order #${response.data.order._id.slice(
+          -8
+        )} confirmed. Redirecting to home...`,
+        {
+          autoClose: 3000,
+        }
+      );
+
+      // Redirect to home page after a short delay
+      setTimeout(() => {
+        navigate("/");
+      }, 3000);
     } catch (error) {
       console.error("COD Order error:", error);
       toast.error(error.response?.data?.message || "Order placement failed");
@@ -301,7 +332,7 @@ const Checkout = () => {
             <h2 className="text-2xl font-bold mb-6">Checkout</h2>
 
             <form onSubmit={handleSubmit} className="space-y-6">
-              {/* Shipping Address (unchanged) */}
+              {/* Shipping Address */}
               <div>
                 <h3 className="text-lg font-semibold mb-4">Shipping Address</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -488,7 +519,7 @@ const Checkout = () => {
             </form>
           </div>
 
-          {/* Order Summary (unchanged) */}
+          {/* Order Summary */}
           <div className="bg-white rounded-lg shadow-md p-8">
             <h2 className="text-2xl font-bold mb-6">Order Summary</h2>
 

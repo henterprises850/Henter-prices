@@ -32,7 +32,8 @@ const Cart = () => {
   };
 
   const calculateTotal = () => {
-    return getCartTotal() + calculateShipping() + calculateTax();
+    // return getCartTotal() + calculateShipping() + calculateTax();
+    return getCartTotal();
   };
 
   if (cartItems.length === 0) {

@@ -292,6 +292,7 @@ const bulkCreateProducts = async (req, res) => {
     // Insert all products
     const createdProducts = await Product.insertMany(validatedProducts);
 
+    console.log(`Bulk created ${createdProducts.length} products`);
     res.status(201).json({
       success: true,
       message: `Successfully created ${createdProducts.length} products`,
