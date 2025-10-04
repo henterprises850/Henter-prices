@@ -105,7 +105,7 @@ const Footer = () => {
             <ul className="space-y-2">
               <li>
                 <Link
-                  to="/contact"
+                  to="/Contact"
                   className="text-gray-300 hover:text-primary-400 transition-colors"
                 >
                   Contact Us
@@ -113,7 +113,7 @@ const Footer = () => {
               </li>
               <li>
                 <Link
-                  to="/shipping"
+                  to="/ShippingInfo"
                   className="text-gray-300 hover:text-primary-400 transition-colors"
                 >
                   Shipping Info
@@ -121,7 +121,7 @@ const Footer = () => {
               </li>
               <li>
                 <Link
-                  to="/returns"
+                  to="/ReturnExchange"
                   className="text-gray-300 hover:text-primary-400 transition-colors"
                 >
                   Returns & Exchanges
@@ -129,7 +129,7 @@ const Footer = () => {
               </li>
               <li>
                 <Link
-                  to="/size-guide"
+                  to="/SizeGuide"
                   className="text-gray-300 hover:text-primary-400 transition-colors"
                 >
                   Size Guide
@@ -137,7 +137,7 @@ const Footer = () => {
               </li>
               <li>
                 <Link
-                  to="/faq"
+                  to="/FAQ"
                   className="text-gray-300 hover:text-primary-400 transition-colors"
                 >
                   FAQ

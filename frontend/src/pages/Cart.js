@@ -24,7 +24,8 @@ const Cart = () => {
   };
 
   const calculateShipping = () => {
-    return getCartTotal() > 999 ? 0 : 99;
+    // return getCartTotal() > 999 ? 0 : 99;
+    return 0;
   };
 
   const calculateTax = () => {

@@ -21,7 +21,15 @@ import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Profile from "./pages/Profile";
 import Orders from "./pages/Orders";
+import SizeGuide from "./pages/SizeGuid";
+import Contact from "./pages/Contact";
+import ShippingInfo from "./pages/ShippingInfo";
+import ReturnExchange from "./pages/ReturnExchanges";
+import Faq from "./pages/FAQ";
 import OrderSuccess from "./pages/OrderSuccess";
+// In your App.js or routing file
+import ManageProducts from "./pages/admin/ManageProducts";
+
 import AdminProducts from "./pages/admin/AdminProducts"; // Add this import
 // Styles
 import "./styles/global.css";
@@ -44,12 +52,21 @@ function App() {
                 <Route path="/register" element={<Register />} />
                 <Route path="/profile" element={<Profile />} />
                 <Route path="/orders" element={<Orders />} />
+                <Route path="/Contact" element={<Contact />} />
+                <Route path="/FAQ" element={<Faq />} />
+                <Route path="/SizeGuide" element={<SizeGuide />} />
+                <Route path="/ShippingInfo" element={<ShippingInfo />} />
+                <Route path="/ReturnExchange" element={<ReturnExchange />} />
                 <Route
                   path="/order-success/:orderId"
                   element={<OrderSuccess />}
                 />
                 {/* Admin Routes */}
                 <Route path="/admin/products" element={<AdminProducts />} />
+                <Route
+                  path="/admin/products/manage"
+                  element={<ManageProducts />}
+                />
               </Routes>
             </main>
             <Footer />
