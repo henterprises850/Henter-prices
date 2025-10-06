@@ -26,6 +26,8 @@ import Contact from "./pages/Contact";
 import ShippingInfo from "./pages/ShippingInfo";
 import ReturnExchange from "./pages/ReturnExchanges";
 import Faq from "./pages/FAQ";
+import TermsConditions from "./pages/TermsConditions";
+import PrivacyPolicy from "./pages/PrivacyPolicy";
 import OrderSuccess from "./pages/OrderSuccess";
 // In your App.js or routing file
 import ManageProducts from "./pages/admin/ManageProducts";
@@ -57,6 +59,8 @@ function App() {
                 <Route path="/SizeGuide" element={<SizeGuide />} />
                 <Route path="/ShippingInfo" element={<ShippingInfo />} />
                 <Route path="/ReturnExchange" element={<ReturnExchange />} />
+                <Route path="/terms" element={<TermsConditions />} />
+                <Route path="/privacy" element={<PrivacyPolicy />} />
                 <Route
                   path="/order-success/:orderId"
                   element={<OrderSuccess />}
