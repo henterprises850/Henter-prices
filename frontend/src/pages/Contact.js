@@ -55,7 +55,11 @@ const Contact = () => {
                       Address
                     </h3>
                     <p className="text-gray-600">
-                      123 Fashion Street, Mumbai, Maharashtra 400001, India
+                      FF 23, JTM Mall, Jagatpura Road, Jaipur Textile Market,
+                      Jagatpura, Jaipur, Rajasthan - 302017
+                    </p>
+                    <p className="text-gray-500 text-sm">
+                      Mon-Sat 11:00 AM - 8:00 PM
                     </p>
                   </div>
                 </div>
@@ -64,7 +68,7 @@ const Contact = () => {
                   <FiPhone className="h-6 w-6 text-primary-400 mt-1 mr-4" />
                   <div>
                     <h3 className="text-lg font-medium text-gray-900">Phone</h3>
-                    <p className="text-gray-600">+91 98765 43210</p>
+                    <p className="text-gray-600">+91 6377802634</p>
                     <p className="text-gray-500 text-sm">
                       Mon-Sat 9:00 AM - 8:00 PM
                     </p>
@@ -75,7 +79,7 @@ const Contact = () => {
                   <FiMail className="h-6 w-6 text-primary-400 mt-1 mr-4" />
                   <div>
                     <h3 className="text-lg font-medium text-gray-900">Email</h3>
-                    <p className="text-gray-600">support@clothstore.com</p>
+                    <p className="text-gray-600">henterprises850@gmail.com</p>
                     <p className="text-gray-500 text-sm">
                       We'll respond within 24 hours
                     </p>
@@ -98,7 +102,7 @@ const Contact = () => {
             </div>
 
             {/* Quick Actions */}
-            <div className="bg-white rounded-lg p-6 shadow-md">
+            {/* <div className="bg-white rounded-lg p-6 shadow-md">
               <h3 className="text-lg font-semibold text-gray-900 mb-4">
                 Quick Actions
               </h3>
@@ -112,11 +116,11 @@ const Contact = () => {
                   Request Callback
                 </button>
               </div>
-            </div>
+            </div> */}
           </div>
 
           {/* Contact Form */}
-          <div className="bg-white rounded-lg shadow-lg p-8">
+          {/* <div className="bg-white rounded-lg shadow-lg p-8">
             <h2 className="text-2xl font-semibold text-gray-900 mb-6">
               Send us a Message
             </h2>
@@ -209,7 +213,7 @@ const Contact = () => {
                 Send Message
               </button>
             </form>
-          </div>
+          </div> */}
         </div>
       </div>
     </div>

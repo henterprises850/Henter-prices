@@ -124,7 +124,7 @@ const Footer = () => {
                   to="/ReturnExchange"
                   className="text-gray-300 hover:text-primary-400 transition-colors"
                 >
-                  Returns & Exchanges
+                  Cancellations & Refunds
                 </Link>
               </li>
               <li>
@@ -153,16 +153,17 @@ const Footer = () => {
               <div className="flex items-center">
                 <FiMapPin className="h-5 w-5 text-primary-400 mr-2" />
                 <span className="text-gray-300">
-                  123 Fashion Street, Mumbai, India
+                  FF 23, JTM Mall, Jagatpura Road, Jaipur Textile Market,
+                  Jagatpura, Jaipur, Rajasthan - 302017
                 </span>
               </div>
               <div className="flex items-center">
                 <FiPhone className="h-5 w-5 text-primary-400 mr-2" />
-                <span className="text-gray-300">+91 98765 43210</span>
+                <span className="text-gray-300">+91 6377802634</span>
               </div>
               <div className="flex items-center">
                 <FiMail className="h-5 w-5 text-primary-400 mr-2" />
-                <span className="text-gray-300">support@clothstore.com</span>
+                <span className="text-gray-300">henterprises850@gmail.com</span>
               </div>
             </div>
           </div>
@@ -170,7 +171,7 @@ const Footer = () => {
 
         <div className="border-t border-gray-800 mt-8 pt-8 text-center">
           <p className="text-gray-400">
-            &copy; 2025 ClothStore. All rights reserved. |
+            &copy; 2025 Henterprises. All rights reserved. |
             <Link to="/privacy" className="hover:text-primary-400 ml-1">
               Privacy Policy
             </Link>{" "}

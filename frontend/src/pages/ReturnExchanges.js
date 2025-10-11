@@ -8,7 +8,7 @@ const Returns = () => {
         {/* Header */}
         <div className="text-center mb-12">
           <h1 className="text-4xl font-bold text-gray-900 mb-4">
-            Returns & Exchanges
+            Cancellations & Refunds
           </h1>
           <p className="text-xl text-gray-600">
             Easy returns within 30 days of delivery
@@ -111,7 +111,7 @@ const Returns = () => {
                 </h3>
                 <p className="text-gray-600">
                   Login to your account and go to "My Orders" → "Return Items"
-                  or call us at +91 98765 43210
+                  or call us at +91 6377802634
                 </p>
               </div>
             </div>
