@@ -7,6 +7,11 @@ const orderSchema = new mongoose.Schema(
       ref: "User",
       required: true,
     },
+    assignedDeliveryBoy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+    },
     orderItems: [
       {
         product: {
@@ -40,7 +45,7 @@ const orderSchema = new mongoose.Schema(
     shippingPrice: { type: Number, default: 0, min: 0 },
     taxPrice: { type: Number, default: 0, min: 0 },
 
-    // UPI Payment Fields
+    // Payment Fields
     upiTransactionId: { type: String },
     upiId: { type: String },
     paymentConfirmationType: {
@@ -48,18 +53,26 @@ const orderSchema = new mongoose.Schema(
       enum: ["auto", "manual", "webhook"],
       default: "manual",
     },
-
-    // General Payment Fields
     paymentId: { type: String },
     paidAt: { type: Date },
     failureReason: { type: String },
     cancellationReason: { type: String },
     cancelledAt: { type: Date },
+
+    // ✅ FIXED: paymentMethod can be string OR object
     paymentMethod: {
-      type: String,
+      type: mongoose.Schema.Types.Mixed, // Changed from String to Mixed
       required: true,
-      enum: ["COD", "UPI", "Online", "GooglePay", "MockRazorpay", "CASHFREE"],
+      default: "COD",
     },
+
+    // ✅ NEW: Store payment method name separately for queries
+    paymentMethodName: {
+      type: String,
+      enum: ["COD", "UPI", "Online", "GooglePay", "CASHFREE", "Card"],
+      default: "COD",
+    },
+
     paymentStatus: {
       type: String,
       default: "pending",
@@ -70,20 +83,78 @@ const orderSchema = new mongoose.Schema(
       default: "pending",
       enum: [
         "pending",
+        "Order Placed",
         "confirmed",
         "processing",
         "shipped",
         "delivered",
         "cancelled",
-        "Order Placed",
       ],
     },
+
     // Cashfree specific fields
     cashfreeOrderId: String,
     paymentSessionId: String,
     cashfreePaymentId: String,
     cashfreeTransactionId: String,
-    // Timestamps
+
+    // ✅ NEW: Store full Cashfree payment details
+    cashfreePaymentDetails: {
+      type: mongoose.Schema.Types.Mixed,
+      default: null,
+    },
+
+    // Status update tracking
+    statusHistory: [
+      {
+        status: String,
+        updatedBy: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "User",
+        },
+        updatedByName: String,
+        updatedByRole: {
+          type: String,
+          enum: ["admin", "deliveryBoy"],
+        },
+        timestamp: { type: Date, default: Date.now },
+        reason: String,
+      },
+    ],
+
+    // Delivery tracking
+    shippingTrackingNumber: String,
+    shippedAt: { type: Date },
+    deliveredAt: { type: Date },
+    deliveryNotes: String,
+
+    // Refund Fields
+    refundStatus: {
+      type: String,
+      enum: ["not_applicable", "pending", "processing", "completed"],
+      default: "pending",
+    },
+    refundAmount: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    refundInitiatedAt: { type: Date },
+    refundCompletedAt: { type: Date },
+    refundTransactionId: String,
+    refundNotes: String,
+
+    isDeleted: {
+      type: Boolean,
+      default: false,
+    },
+    deletedAt: Date,
+    deletedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+    },
+    deletedByName: String,
+
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now },
   },
@@ -91,5 +162,14 @@ const orderSchema = new mongoose.Schema(
     timestamps: true,
   }
 );
+
+// Indexes
+orderSchema.index({ user: 1, createdAt: -1 });
+orderSchema.index({ assignedDeliveryBoy: 1, createdAt: -1 });
+orderSchema.index({ orderStatus: 1 });
+orderSchema.index({ paymentStatus: 1 });
+orderSchema.index({ paymentMethodName: 1 });
+orderSchema.index({ refundStatus: 1 });
+orderSchema.index({ isDeleted: 1 });
 
 module.exports = mongoose.model("Order", orderSchema);

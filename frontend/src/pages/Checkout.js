@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useCart } from "../context/CartContext";
@@ -27,21 +27,23 @@ const Checkout = () => {
 
   useEffect(() => {
     if (cartItems.length === 0) {
+      toast.warning("Your cart is empty");
       navigate("/cart");
+      return;
     }
     initializeCashfree();
   }, [cartItems, navigate]);
 
-  // Initialize Cashfree SDK
   const initializeCashfree = async () => {
     try {
       const cashfreeInstance = await load({
-        mode: process.env.REACT_APP_CASHFREE_MODE || "sandbox", // sandbox or production
+        mode: process.env.REACT_APP_CASHFREE_MODE || "sandbox",
       });
       setCashfree(cashfreeInstance);
+      console.log("✅ Cashfree initialized");
     } catch (error) {
-      console.error("Failed to initialize Cashfree:", error);
-      toast.error("Payment system initialization failed");
+      console.error("❌ Cashfree initialization failed:", error);
+      toast.error("Payment system unavailable. Using COD only.");
     }
   };
 
@@ -54,8 +56,6 @@ const Checkout = () => {
 
   const calculateTotal = () => {
     const subtotal = getCartTotal();
-    // const shipping = subtotal > 999 ? 0 : 99;
-    // const tax = Math.round(subtotal * 0.18);
     const shipping = 0;
     const tax = 0;
     const total = subtotal + shipping + tax;
@@ -64,7 +64,6 @@ const Checkout = () => {
 
   const { subtotal, shipping, tax, total } = calculateTotal();
 
-  // Validate shipping address
   const validateShippingAddress = () => {
     const required = [
       "fullName",
@@ -77,7 +76,7 @@ const Checkout = () => {
     return required.every((field) => shippingAddress[field]?.trim());
   };
 
-  // Cashfree Payment Handler
+  // ✅ UPDATED: Cashfree Payment Handler - Redirect to verification page
   const handleCashfreePayment = async () => {
     try {
       if (!validateShippingAddress()) {
@@ -86,9 +85,7 @@ const Checkout = () => {
       }
 
       if (!cashfree) {
-        toast.error(
-          "Payment system not initialized. Please refresh and try again."
-        );
+        toast.error("Payment system not ready. Please refresh and try again.");
         return;
       }
 
@@ -106,13 +103,13 @@ const Checkout = () => {
           image: item.images[0],
         })),
         shippingAddress,
-        paymentMethod: "CASHFREE",
-        totalPrice: total,
-        shippingPrice: shipping,
-        taxPrice: tax,
+        shippingPrice: 0,
+        taxPrice: 0,
+        paymentMethodName: "CASHFREE",
       };
 
-      const response = await axios.post(
+      // Create order on backend
+      const createResponse = await axios.post(
         `${process.env.REACT_APP_API_URL}/api/payment/cashfree/create-order`,
         {
           orderData,
@@ -126,135 +123,48 @@ const Checkout = () => {
         {
           headers: {
             Authorization: `Bearer ${localStorage.getItem("token")}`,
-            "Content-Type": "application/json",
           },
+          timeout: 15000,
         }
       );
 
-      console.log("Orderdata created:", orderData);
-
-      if (response.data.success) {
-        const { paymentSessionId, orderId } = response.data;
-
-        // Open Cashfree checkout
-        const checkoutOptions = {
-          paymentSessionId: paymentSessionId,
-          redirectTarget: "_self",
-        };
-
-        toast.success("Opening payment gateway...");
-
-        // Handle payment result
-        const result = await cashfree.checkout(checkoutOptions);
-
-        if (result.error) {
-          console.error("Payment failed:", result.error);
-          toast.error("Payment failed. Please try again.");
-
-          // Mark order as failed
-          await handlePaymentResult(orderId, "FAILED", result.error);
-        } else {
-          console.log("Payment completed successfully:", result);
-
-          // Verify payment on backend
-          setTimeout(() => {
-            verifyPayment(orderId);
-          }, 2000);
-        }
-      } else {
-        toast.error(response.data.message || "Failed to create payment order");
+      if (!createResponse.data.success) {
+        throw new Error(createResponse.data.message);
       }
+
+      const { paymentSessionId, orderId } = createResponse.data;
+
+      console.log("✅ Order created:", orderId);
+      toast.success("Opening payment gateway...");
+
+      // ✅ NEW: Store order ID in sessionStorage for verification page
+      sessionStorage.setItem("paymentOrderId", orderId);
+
+      // ✅ UPDATED: Open Cashfree with redirect to verification page
+      const redirectUrl = `${window.location.origin}/payment-status?orderId=${orderId}&sessionId=${paymentSessionId}`;
+
+      console.log("🔄 Opening payment with redirect to:", redirectUrl);
+
+      await cashfree.checkout({
+        paymentSessionId,
+        redirectTarget: "_self", // ✅ CHANGED: Stay on same tab
+        returnUrl: redirectUrl, // ✅ NEW: Redirect after payment
+      });
+
+      // ✅ If checkout returns without redirect, navigate manually
+      setTimeout(() => {
+        window.location.href = redirectUrl;
+      }, 2000);
     } catch (error) {
-      console.error("Cashfree payment error:", error);
+      console.error("❌ Cashfree payment error:", error);
+      setLoading(false);
       toast.error(
         error.response?.data?.message || "Payment initialization failed"
       );
-    } finally {
-      setLoading(false);
     }
   };
 
-  // Verify payment status - UPDATED TO REDIRECT TO HOME PAGE
-  const verifyPayment = async (orderId) => {
-    try {
-      setLoading(true);
-      toast.info("Verifying payment...");
-
-      const response = await axios.get(
-        `${process.env.REACT_APP_API_URL}/api/payment/cashfree/verify/${orderId}`,
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
-        }
-      );
-
-      if (response.data.success) {
-        const { paymentStatus, order } = response.data;
-
-        if (paymentStatus === "SUCCESS") {
-          clearCart();
-          // Show success message with order details
-          toast.success(
-            `🎉 Payment successful! Order #${orderId.slice(
-              -8
-            )} confirmed. Redirecting to home...`,
-            {
-              autoClose: 3000,
-            }
-          );
-
-          // Redirect to home page after a short delay to show the success message
-          setTimeout(() => {
-            navigate("/");
-          }, 3000);
-        } else if (paymentStatus === "PENDING") {
-          toast.warning(
-            "Payment is being processed. You'll receive confirmation shortly."
-          );
-          // Optional: You can also redirect to home for pending payments
-          setTimeout(() => {
-            navigate("/");
-          }, 2000);
-        } else {
-          toast.error("Payment failed or was cancelled.");
-          // Stay on checkout page for failed payments
-          // Or redirect to home if you prefer
-          // navigate("/");
-        }
-      } else {
-        toast.error("Payment verification failed");
-      }
-    } catch (error) {
-      console.error("Payment verification error:", error);
-      toast.error("Failed to verify payment status");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Handle payment result callback
-  const handlePaymentResult = async (orderId, status, error = null) => {
-    try {
-      await axios.post(
-        `${process.env.REACT_APP_API_URL}/api/payment/cashfree/callback`,
-        {
-          orderId,
-          status,
-          error: error?.message || error,
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
-        }
-      );
-    } catch (err) {
-      console.error("Failed to update payment status:", err);
-    }
-  };
-
-  // COD Order Handler - ALSO UPDATED TO REDIRECT TO HOME PAGE
+  // ✅ COD Order Handler
   const handleCODOrder = async () => {
     try {
       if (!validateShippingAddress()) {
@@ -263,6 +173,7 @@ const Checkout = () => {
       }
 
       setLoading(true);
+
       const orderData = {
         orderItems: cartItems.map((item) => ({
           product: item._id,
@@ -274,39 +185,34 @@ const Checkout = () => {
           image: item.images[0],
         })),
         shippingAddress,
-        paymentMethod: "COD",
-        totalPrice: total,
-        shippingPrice: shipping,
-        taxPrice: tax,
+        shippingPrice: 0,
+        taxPrice: 0,
       };
 
       const response = await axios.post(
-        `${process.env.REACT_APP_API_URL}/api/orders`,
-        orderData,
+        `${process.env.REACT_APP_API_URL}/api/payment/cod/create-order`,
+        { orderData, amount: total },
         {
           headers: {
             Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
+          timeout: 10000,
         }
       );
 
-      clearCart();
-      // Show success message for COD orders
-      toast.success(
-        `🎉 Order placed successfully! Order #${response.data.order._id.slice(
-          -8
-        )} confirmed. Redirecting to home...`,
-        {
-          autoClose: 3000,
-        }
-      );
+      if (response.data.success) {
+        clearCart();
+        toast.success(
+          `✅ Order placed! Order #${response.data.orderId.slice(-8)}.`,
+          { autoClose: 2000 }
+        );
 
-      // Redirect to home page after a short delay
-      setTimeout(() => {
-        navigate("/");
-      }, 3000);
+        setTimeout(() => {
+          navigate("/", { replace: true });
+        }, 2000);
+      }
     } catch (error) {
-      console.error("COD Order error:", error);
+      console.error("❌ COD order error:", error);
       toast.error(error.response?.data?.message || "Order placement failed");
     } finally {
       setLoading(false);
@@ -323,6 +229,7 @@ const Checkout = () => {
     }
   };
 
+  // [Rest of the JSX remains the same as before]
   return (
     <div className="min-h-screen bg-gray-50 py-12">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -335,6 +242,7 @@ const Checkout = () => {
               {/* Shipping Address */}
               <div>
                 <h3 className="text-lg font-semibold mb-4">Shipping Address</h3>
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -357,6 +265,7 @@ const Checkout = () => {
                       type="tel"
                       name="phone"
                       required
+                      placeholder="10 digit number"
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                       value={shippingAddress.phone}
                       onChange={handleAddressChange}
@@ -427,6 +336,7 @@ const Checkout = () => {
                       type="text"
                       name="pincode"
                       required
+                      placeholder="6 digit code"
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                       value={shippingAddress.pincode}
                       onChange={handleAddressChange}
@@ -447,7 +357,7 @@ const Checkout = () => {
                       value="COD"
                       checked={paymentMethod === "COD"}
                       onChange={(e) => setPaymentMethod(e.target.value)}
-                      className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
+                      className="h-4 w-4 text-blue-600"
                     />
                     <label
                       htmlFor="cod"
@@ -465,24 +375,21 @@ const Checkout = () => {
                       value="CASHFREE"
                       checked={paymentMethod === "CASHFREE"}
                       onChange={(e) => setPaymentMethod(e.target.value)}
-                      className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
+                      className="h-4 w-4 text-blue-600"
                     />
                     <label
                       htmlFor="cashfree"
                       className="ml-3 block text-sm font-medium text-gray-700"
                     >
-                      💳 Online Payment (Cards, UPI, Net Banking)
+                      💳 Online Payment (UPI, Cards, Net Banking)
                     </label>
                   </div>
                 </div>
 
-                {/* Payment Method Info */}
                 {paymentMethod === "CASHFREE" && (
                   <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-md">
                     <p className="text-sm text-blue-800">
-                      💳 <strong>Secure Online Payment:</strong> Pay using
-                      Credit/Debit Cards, UPI, Net Banking, or Wallets. Powered
-                      by Cashfree - 100% secure and fast.
+                      🔒 100% secure payment powered by Cashfree
                     </p>
                   </div>
                 )}
@@ -490,8 +397,7 @@ const Checkout = () => {
                 {paymentMethod === "COD" && (
                   <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-md">
                     <p className="text-sm text-green-800">
-                      💵 <strong>Cash on Delivery:</strong> Pay when your order
-                      arrives at your doorstep. No advance payment required.
+                      Pay when your order arrives at your doorstep
                     </p>
                   </div>
                 )}
@@ -502,20 +408,38 @@ const Checkout = () => {
                 disabled={
                   loading || (paymentMethod === "CASHFREE" && !cashfree)
                 }
-                className="w-full bg-blue-600 text-white py-3 px-4 rounded-md font-semibold hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="w-full bg-blue-600 text-white py-3 px-4 rounded-md font-semibold hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center"
               >
-                {loading
-                  ? "Processing..."
-                  : paymentMethod === "CASHFREE"
-                  ? `Pay ₹${total} - Secure Payment`
-                  : `Place Order - ₹${total}`}
+                {loading ? (
+                  <>
+                    <svg
+                      className="animate-spin -ml-1 mr-3 h-4 w-4"
+                      xmlns="http://www.w3.org/2000/svg"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                    >
+                      <circle
+                        className="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                      ></circle>
+                      <path
+                        className="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                      ></path>
+                    </svg>
+                    Processing...
+                  </>
+                ) : paymentMethod === "CASHFREE" ? (
+                  `Pay ₹${total.toLocaleString()} - Secure Payment`
+                ) : (
+                  `Place Order - ₹${total.toLocaleString()}`
+                )}
               </button>
-
-              {paymentMethod === "CASHFREE" && !cashfree && (
-                <p className="text-sm text-red-600 text-center">
-                  Payment system is loading... Please wait.
-                </p>
-              )}
             </form>
           </div>
 
@@ -537,11 +461,11 @@ const Checkout = () => {
                       Size: {item.selectedSize} | Color: {item.selectedColor}
                     </p>
                     <p className="text-sm text-gray-600">
-                      Qty: {item.quantity} × ₹{item.price}
+                      Qty: {item.quantity} × ₹{item.price.toLocaleString()}
                     </p>
                   </div>
                   <div className="text-lg font-semibold">
-                    ₹{item.price * item.quantity}
+                    ₹{(item.price * item.quantity).toLocaleString()}
                   </div>
                 </div>
               ))}
@@ -550,28 +474,30 @@ const Checkout = () => {
             <div className="border-t pt-6">
               <div className="flex justify-between mb-2">
                 <span>Subtotal</span>
-                <span>₹{subtotal}</span>
+                <span>₹{subtotal.toLocaleString()}</span>
               </div>
               <div className="flex justify-between mb-2">
                 <span>Shipping</span>
-                <span>{shipping === 0 ? "Free" : `₹${shipping}`}</span>
+                <span className="text-green-600">Free</span>
               </div>
               <div className="flex justify-between mb-2">
                 <span>Tax (GST)</span>
-                <span>₹{tax}</span>
+                <span>₹0</span>
               </div>
               <div className="border-t pt-2 flex justify-between text-lg font-bold">
                 <span>Total</span>
-                <span>₹{total}</span>
+                <span className="text-green-600">
+                  ₹{total.toLocaleString()}
+                </span>
               </div>
             </div>
 
             {paymentMethod === "CASHFREE" && (
               <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-md">
                 <p className="text-sm text-green-800 text-center">
-                  🔒 <strong>100% Secure Payment</strong>
+                  🔒 <strong>100% Secure</strong>
                   <br />
-                  Your payment information is encrypted and secure
+                  Your payment is encrypted and secure
                 </p>
               </div>
             )}

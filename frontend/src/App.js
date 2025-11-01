@@ -29,10 +29,16 @@ import Faq from "./pages/FAQ";
 import TermsConditions from "./pages/TermsConditions";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import OrderSuccess from "./pages/OrderSuccess";
+import About from "./pages/About";
 // In your App.js or routing file
 import ManageProducts from "./pages/admin/ManageProducts";
 
 import AdminProducts from "./pages/admin/AdminProducts"; // Add this import
+import AdminOrders from "./pages/admin/AdminOrderManagement";
+import DeliveryBoyDashboard from "./pages/deliveryboy/DeliveryBoyDashboard";
+import { ProtectedRoute } from "./pages/ProtectedRoute";
+import DeliveryBoyManagement from "./pages/admin/DeliveryBoyManagement";
+import PaymentStatus from "./pages/PaymentStatus";
 // Styles
 import "./styles/global.css";
 
@@ -61,15 +67,52 @@ function App() {
                 <Route path="/ReturnExchange" element={<ReturnExchange />} />
                 <Route path="/terms" element={<TermsConditions />} />
                 <Route path="/privacy" element={<PrivacyPolicy />} />
+                <Route path="/about" element={<About />} />
+                <Route path="/payment-status" element={<PaymentStatus />} />
                 <Route
                   path="/order-success/:orderId"
                   element={<OrderSuccess />}
                 />
                 {/* Admin Routes */}
-                <Route path="/admin/products" element={<AdminProducts />} />
+                <Route
+                  path="/admin/products"
+                  element={
+                    <ProtectedRoute requiredRole="admin">
+                      <AdminProducts />
+                    </ProtectedRoute>
+                  }
+                />
                 <Route
                   path="/admin/products/manage"
-                  element={<ManageProducts />}
+                  element={
+                    <ProtectedRoute requiredRole="admin">
+                      <ManageProducts />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/admin/ordermanagement"
+                  element={
+                    <ProtectedRoute requiredRole="admin">
+                      <AdminOrders />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/admin/delivery-boys"
+                  element={
+                    <ProtectedRoute requiredRole="admin">
+                      <DeliveryBoyManagement />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/delivery-boy/dashboard"
+                  element={
+                    <ProtectedRoute requiredRole="deliveryBoy">
+                      <DeliveryBoyDashboard />
+                    </ProtectedRoute>
+                  }
                 />
               </Routes>
             </main>

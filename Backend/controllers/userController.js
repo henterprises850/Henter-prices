@@ -19,7 +19,8 @@ const registerUser = async (req, res) => {
       });
     }
 
-    const { name, email, password, phone } = req.body;
+    const { name, email, password, phone, isDeliveryBoy, deliveryDetails } =
+      req.body;
 
     const userExists = await User.findOne({ email });
     if (userExists) {
@@ -29,12 +30,33 @@ const registerUser = async (req, res) => {
       });
     }
 
-    const user = await User.create({
+    // Prepare user data
+    const userData = {
       name,
       email,
       password,
       phone,
-    });
+      isAdmin: false, // Never allow self-registration as admin
+      isDeliveryBoy: isDeliveryBoy || false,
+    };
+
+    // Add delivery details if registering as delivery boy
+    if (isDeliveryBoy && deliveryDetails) {
+      userData.deliveryDetails = {
+        vehicleNumber: deliveryDetails.vehicleNumber,
+        licenseNumber: deliveryDetails.licenseNumber,
+        assignedArea: deliveryDetails.assignedArea,
+        phoneVerified: false,
+        documentsVerified: false,
+        status: "inactive", // Requires admin approval
+        joinDate: new Date(),
+        totalDeliveries: 0,
+        successfulDeliveries: 0,
+        rating: 0,
+      };
+    }
+
+    const user = await User.create(userData);
 
     const token = generateToken(user._id);
 
@@ -47,6 +69,7 @@ const registerUser = async (req, res) => {
         email: user.email,
         phone: user.phone,
         isAdmin: user.isAdmin,
+        isDeliveryBoy: user.isDeliveryBoy,
       },
       token,
     });
@@ -79,6 +102,32 @@ const loginUser = async (req, res) => {
       });
     }
 
+    // ✅ NEW: Check if user is a delivery boy and verify their status
+    if (user.isDeliveryBoy) {
+      if (user.deliveryDetails.status !== "active") {
+        return res.status(403).json({
+          success: false,
+          message: `Your delivery boy account is currently ${user.deliveryDetails.status}. Please contact the administrator to activate your account.`,
+          userRole: "deliveryBoy",
+          accountStatus: user.deliveryDetails.status,
+        });
+      }
+
+      // Check if documents and phone are verified
+      if (
+        !user.deliveryDetails.documentsVerified ||
+        !user.deliveryDetails.phoneVerified
+      ) {
+        return res.status(403).json({
+          success: false,
+          message:
+            "Your account is pending verification. Please contact the administrator.",
+          userRole: "deliveryBoy",
+          accountStatus: "pending_verification",
+        });
+      }
+    }
+
     const token = generateToken(user._id);
 
     res.json({
@@ -90,6 +139,12 @@ const loginUser = async (req, res) => {
         email: user.email,
         phone: user.phone,
         isAdmin: user.isAdmin,
+        isDeliveryBoy: user.isDeliveryBoy,
+        role: user.isAdmin
+          ? "admin"
+          : user.isDeliveryBoy
+          ? "deliveryBoy"
+          : "customer",
         address: user.address,
       },
       token,

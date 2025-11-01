@@ -48,23 +48,44 @@ export const AuthProvider = ({ children }) => {
     try {
       const response = await axios.post(
         `${process.env.REACT_APP_API_URL}/api/users/login`,
+        { email, password },
         {
-          email,
-          password,
+          timeout: 10000,
         }
       );
 
-      const { user, token } = response.data;
+      const { user: userData, token: newToken } = response.data;
 
-      setUser(user);
-      setToken(token);
-      localStorage.setItem("token", token);
-      axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
+      // Add role
+      let userRole = "customer";
+      if (userData.isAdmin) {
+        userRole = "admin";
+      } else if (userData.isDeliveryBoy) {
+        userRole = "deliveryBoy";
+      }
+
+      const fullUserData = { ...userData, role: userRole };
+
+      // Update state
+      setUser(fullUserData);
+      setToken(newToken);
+      localStorage.setItem("token", newToken);
+      axios.defaults.headers.common["Authorization"] = `Bearer ${newToken}`;
 
       toast.success("Login successful!");
       return { success: true };
     } catch (error) {
-      const message = error.response?.data?.message || "Login failed";
+      // ✅ Handle delivery boy status errors
+      if (error.response?.status === 403) {
+        const message =
+          error.response?.data?.message ||
+          "Your account is not active. Please contact administrator.";
+        toast.error(message);
+        return { success: false, message };
+      }
+
+      const message =
+        error.response?.data?.message || error.message || "Login failed";
       toast.error(message);
       return { success: false, message };
     }

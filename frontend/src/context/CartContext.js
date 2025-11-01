@@ -1,156 +1,131 @@
-import React, { createContext, useState, useContext, useEffect } from "react";
+import React, { createContext, useContext, useState, useEffect } from "react";
 import { toast } from "react-toastify";
-import axios from "axios";
-import { useAuth } from "./AuthContext";
 
 const CartContext = createContext();
-
-export const useCart = () => {
-  const context = useContext(CartContext);
-  if (!context) {
-    throw new Error("useCart must be used within a CartProvider");
-  }
-  return context;
-};
 
 export const CartProvider = ({ children }) => {
   const [cartItems, setCartItems] = useState([]);
   const [loading, setLoading] = useState(false);
-  const { user, isAuthenticated } = useAuth();
 
-  // Load cart from database when user logs in
+  // ✅ Load cart from localStorage on mount
   useEffect(() => {
-    if (isAuthenticated && user) {
-      loadCartFromDatabase();
-    } else {
-      // Load from localStorage if not authenticated
-      const savedCart = localStorage.getItem("cart");
-      if (savedCart) {
-        setCartItems(JSON.parse(savedCart));
+    const savedCart = localStorage.getItem("cart");
+    if (savedCart) {
+      try {
+        const parsedCart = JSON.parse(savedCart);
+        setCartItems(parsedCart);
+        console.log(
+          "✅ Cart loaded from localStorage:",
+          parsedCart.length,
+          "items"
+        );
+      } catch (error) {
+        console.error("❌ Error loading cart:", error);
+        setCartItems([]);
+        localStorage.removeItem("cart");
       }
     }
-  }, [isAuthenticated, user]);
+  }, []);
 
-  // Sync cart to database whenever cartItems changes (for authenticated users)
+  // ✅ Save cart to localStorage whenever it changes
   useEffect(() => {
-    if (isAuthenticated && user && cartItems.length >= 0) {
-      syncCartToDatabase();
-    }
-    // Always save to localStorage as backup
     localStorage.setItem("cart", JSON.stringify(cartItems));
-  }, [cartItems, isAuthenticated, user]);
+    console.log("💾 Cart saved to localStorage:", cartItems.length, "items");
+  }, [cartItems]);
 
-  const loadCartFromDatabase = async () => {
-    try {
-      setLoading(true);
-      const response = await axios.get(
-        `${process.env.REACT_APP_API_URL}/api/cart`
+  // ✅ FIXED: Correct parameter order
+  const addToCart = (product, size, color, quantity) => {
+    console.log("📦 Adding to cart:", {
+      productName: product.name,
+      size,
+      color,
+      quantity,
+    });
+
+    setCartItems((prev) => {
+      // Check if exact same product with same size/color already exists
+      const existingItem = prev.find(
+        (item) =>
+          item._id === product._id &&
+          item.selectedSize === size &&
+          item.selectedColor === color
       );
 
-      if (response.data.success && response.data.cart.items.length > 0) {
-        // Convert backend cart format to frontend format
-        const frontendCartItems = response.data.cart.items.map((item) => ({
-          ...item.product,
-          selectedSize: item.size,
-          selectedColor: item.color,
-          quantity: item.quantity,
-          cartId: `${item.product._id}-${item.size}-${item.color}`,
-        }));
-        setCartItems(frontendCartItems);
-      }
-    } catch (error) {
-      console.error("Error loading cart from database:", error);
-      // Fallback to localStorage
-      const savedCart = localStorage.getItem("cart");
-      if (savedCart) {
-        setCartItems(JSON.parse(savedCart));
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const syncCartToDatabase = async () => {
-    try {
-      await axios.post(`${process.env.REACT_APP_API_URL}/api/cart/save`, {
-        items: cartItems,
-      });
-    } catch (error) {
-      console.error("Error syncing cart to database:", error);
-    }
-  };
-
-  const addToCart = (product, size, color, quantity = 1) => {
-    const existingItem = cartItems.find(
-      (item) =>
-        item._id === product._id &&
-        item.selectedSize === size &&
-        item.selectedColor === color
-    );
-
-    if (existingItem) {
-      setCartItems(
-        cartItems.map((item) =>
+      if (existingItem) {
+        // ✅ Update quantity if already in cart
+        const updatedCart = prev.map((item) =>
           item._id === product._id &&
           item.selectedSize === size &&
           item.selectedColor === color
             ? { ...item, quantity: item.quantity + quantity }
             : item
-        )
-      );
-    } else {
-      setCartItems([
-        ...cartItems,
-        {
-          ...product,
-          selectedSize: size,
-          selectedColor: color,
-          quantity,
-          cartId: `${product._id}-${size}-${color}`,
-        },
-      ]);
-    }
+        );
 
-    toast.success("Item added to cart!");
+        console.log("✅ Updated quantity for existing item");
+        toast.success(`Updated quantity in cart`);
+        return updatedCart;
+      }
+
+      // ✅ Add new item to cart
+      const newItem = {
+        cartId: `${product._id}_${size}_${color}_${Date.now()}`,
+        _id: product._id,
+        name: product.name,
+        price: product.price,
+        images: product.images || [],
+        quantity,
+        selectedSize: size,
+        selectedColor: color,
+      };
+
+      console.log("✅ New item added to cart:", newItem);
+      toast.success(`${product.name} added to cart!`);
+
+      return [...prev, newItem];
+    });
   };
 
   const removeFromCart = (cartId) => {
-    setCartItems(cartItems.filter((item) => item.cartId !== cartId));
-    toast.success("Item removed from cart!");
+    console.log("🗑️  Removing item from cart:", cartId);
+
+    setCartItems((prev) => {
+      const updatedCart = prev.filter((item) => item.cartId !== cartId);
+      if (updatedCart.length < prev.length) {
+        toast.success("Item removed from cart");
+      }
+      return updatedCart;
+    });
   };
 
   const updateQuantity = (cartId, quantity) => {
+    console.log("🔄 Updating quantity:", cartId, quantity);
+
     if (quantity <= 0) {
       removeFromCart(cartId);
       return;
     }
 
-    setCartItems(
-      cartItems.map((item) =>
+    setCartItems((prev) =>
+      prev.map((item) =>
         item.cartId === cartId ? { ...item, quantity } : item
       )
     );
   };
 
+  // ✅ Clear cart properly
   const clearCart = () => {
+    console.log("🗑️  Clearing entire cart...");
     setCartItems([]);
     localStorage.removeItem("cart");
-
-    // Clear from database if user is authenticated
-    if (isAuthenticated && user) {
-      axios
-        .delete(`${process.env.REACT_APP_API_URL}/api/cart/clear`)
-        .catch((error) =>
-          console.error("Error clearing cart from database:", error)
-        );
-    }
+    console.log("✅ Cart cleared completely");
   };
 
   const getCartTotal = () => {
-    return cartItems.reduce(
-      (total, item) => total + item.price * item.quantity,
+    const total = cartItems.reduce(
+      (sum, item) => sum + item.price * item.quantity,
       0
     );
+    return Math.round(total * 100) / 100; // ✅ Round to 2 decimals
   };
 
   const getCartCount = () => {
@@ -159,15 +134,22 @@ export const CartProvider = ({ children }) => {
 
   const value = {
     cartItems,
-    loading,
     addToCart,
     removeFromCart,
     updateQuantity,
     clearCart,
     getCartTotal,
     getCartCount,
-    syncCartToDatabase,
+    loading,
   };
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
+};
+
+export const useCart = () => {
+  const context = useContext(CartContext);
+  if (!context) {
+    throw new Error("useCart must be used within CartProvider");
+  }
+  return context;
 };

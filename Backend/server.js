@@ -15,6 +15,8 @@ const productRoutes = require("./routes/productRoutes");
 const cartRoutes = require("./routes/cartRoutes");
 const orderRoutes = require("./routes/orderRoutes");
 const paymentRoutes = require("./routes/paymentRoutes");
+const deliveryBoyRoutes = require("./routes/deliveryBoyRoutes");
+const deliveryBoyVerificationRoutes = require("./routes/deliveryBoyVerificationRoutes");
 
 const app = express();
 
@@ -46,7 +48,7 @@ app.use(
 // Rate limiting
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // limit each IP to 100 requests per windowMs
+  max: 1000, // limit each IP to 100 requests per windowMs
   message: {
     error: "Too many requests from this IP, please try again later.",
   },
@@ -98,6 +100,8 @@ app.use("/api/products", productRoutes);
 app.use("/api/cart", cartRoutes);
 app.use("/api/orders", orderRoutes);
 app.use("/api/payment", paymentRoutes);
+app.use("/api/delivery-boy", deliveryBoyRoutes);
+app.use("/api/admin/delivery-boys", deliveryBoyVerificationRoutes);
 
 // Catch-all route for undefined endpoints
 app.use("/api/*", (req, res) => {

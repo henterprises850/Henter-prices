@@ -49,12 +49,12 @@ const Navbar = () => {
               >
                 Products
               </Link>
-              <Link
+              {/* <Link
                 to="/categories"
                 className="text-gray-700 hover:text-primary-600 px-3 py-2 transition-colors"
               >
                 Categories
-              </Link>
+              </Link> */}
               <Link
                 to="/about"
                 className="text-gray-700 hover:text-primary-600 px-3 py-2 transition-colors"
@@ -76,6 +76,33 @@ const Navbar = () => {
                 >
                   <FiSettings className="mr-1" />
                   Admin
+                </Link>
+              )}
+              {isAuthenticated && user?.isAdmin && (
+                <Link
+                  to="/admin/ordermanagement"
+                  className="text-orange-600 hover:text-orange-700 px-3 py-2 transition-colors font-semibold flex items-center"
+                >
+                  <FiSettings className="mr-1" />
+                  Order Management
+                </Link>
+              )}
+              {isAuthenticated && user?.isAdmin && (
+                <Link
+                  to="/admin/delivery-boys"
+                  className="text-orange-600 hover:text-orange-700 px-3 py-2 transition-colors font-semibold flex items-center"
+                >
+                  <FiSettings className="mr-1" />
+                  Delivery Boy Management
+                </Link>
+              )}
+              {isAuthenticated && user?.isDeliveryBoy && (
+                <Link
+                  to="/delivery-boy/dashboard"
+                  className="text-orange-600 hover:text-orange-700 px-3 py-2 transition-colors font-semibold flex items-center"
+                >
+                  <FiSettings className="mr-1" />
+                  Delivery Boy Dashboard
                 </Link>
               )}
             </div>
