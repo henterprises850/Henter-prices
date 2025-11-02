@@ -69,7 +69,15 @@ const orderSchema = new mongoose.Schema(
     // ✅ NEW: Store payment method name separately for queries
     paymentMethodName: {
       type: String,
-      enum: ["COD", "UPI", "Online", "GooglePay", "CASHFREE", "Card"],
+      enum: [
+        "COD",
+        "UPI",
+        "Online",
+        "GooglePay",
+        "CASHFREE",
+        "Card",
+        "SABPAISA",
+      ],
       default: "COD",
     },
 

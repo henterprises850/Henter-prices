@@ -372,7 +372,7 @@ const verifyCashfreePayment = async (req, res) => {
             paymentStatus: "completed",
             paidAt: new Date(),
             cashfreePaymentId: successfulPayment.cf_payment_id,
-            paymentMethodName: successfulPayment.payment_method,
+            paymentMethod: successfulPayment.payment_method,
             paymentAmount: successfulPayment.amount,
 
             // ✅ Order Status
@@ -708,10 +708,522 @@ const createCODOrder = async (req, res) => {
   }
 };
 
+// ============================================
+// SABPAISA PAYMENT INTEGRATION (UPDATED)
+// ============================================
+
+// ✅ Sabpaisa Configuration
+const SABPAISA_CLIENT_CODE = process.env.SABPAISA_CLIENT_CODE;
+const SABPAISA_TRANS_USERNAME = process.env.SABPAISA_TRANS_USERNAME;
+const SABPAISA_TRANS_PASSWORD = process.env.SABPAISA_TRANS_PASSWORD;
+const SABPAISA_AUTH_KEY = process.env.SABPAISA_AUTH_KEY;
+const SABPAISA_AUTH_IV = process.env.SABPAISA_AUTH_IV;
+const SABPAISA_CALLBACK_URL = process.env.SABPAISA_CALLBACK_URL;
+const SABPAISA_MCC = process.env.SABPAISA_MCC || "5411";
+const SABPAISA_CHANNEL_ID = process.env.SABPAISA_CHANNEL_ID || "W";
+const SABPAISA_API_URL =
+  process.env.SABPAISA_ENVIRONMENT === "production"
+    ? "https://api.sabpaisa.com"
+    : "	https://stage-securepay.sabpaisa.in/SabPaisa/sabPaisaInit?v=1";
+
+// ✅ Validate configuration
+if (
+  !SABPAISA_CLIENT_CODE ||
+  !SABPAISA_TRANS_USERNAME ||
+  !SABPAISA_TRANS_PASSWORD ||
+  !SABPAISA_AUTH_KEY ||
+  !SABPAISA_AUTH_IV
+) {
+  console.error("❌ Sabpaisa credentials not configured!");
+}
+
+// ✅ Generate unique order ID for Sabpaisa
+const generateSabpaisaOrderId = () => {
+  return `sabp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+};
+
+// ============================================
+// SABPAISA ENCRYPTION/DECRYPTION (FIXED)
+// ============================================
+
+// ✅ FIXED: Proper validation and conversion
+const encryptSabpaisa = (data) => {
+  try {
+    // ✅ Validate and prepare key
+    let authKey = SABPAISA_AUTH_KEY;
+    if (!authKey || authKey.length === 0) {
+      throw new Error("SABPAISA_AUTH_KEY not configured");
+    }
+
+    // Convert hex string to buffer (must be 32 chars = 16 bytes for 256-bit key)
+    if (authKey.length !== 64) {
+      console.warn(
+        `⚠️ AUTH_KEY length is ${authKey.length}, expected 64 (for 256-bit)`
+      );
+    }
+    const key = Buffer.from(authKey, "hex");
+
+    // ✅ Validate and prepare IV
+    let authIV = SABPAISA_AUTH_IV;
+    if (!authIV || authIV.length === 0) {
+      throw new Error("SABPAISA_AUTH_IV not configured");
+    }
+
+    // Convert hex string to buffer (must be 32 chars = 16 bytes)
+    if (authIV.length !== 32) {
+      console.error(
+        `❌ AUTH_IV length is ${authIV.length}, must be exactly 32 (for 16 bytes)`
+      );
+      throw new Error(
+        `Invalid AUTH_IV length: ${authIV.length}, expected 32 characters`
+      );
+    }
+    const iv = Buffer.from(authIV, "hex");
+
+    console.log("🔐 Encryption details:");
+    console.log("   Key length:", key.length, "bytes");
+    console.log("   IV length:", iv.length, "bytes");
+
+    // ✅ Create cipher
+    const cipher = crypto.createCipheriv("aes-256-cbc", key, iv);
+
+    // ✅ Encrypt data
+    let encrypted = cipher.update(JSON.stringify(data), "utf8", "hex");
+    encrypted += cipher.final("hex");
+
+    console.log("✅ Encryption successful");
+    return encrypted;
+  } catch (error) {
+    console.error("❌ Encryption error:", error.message);
+    throw new Error(`Encryption failed: ${error.message}`);
+  }
+};
+
+// ✅ FIXED: Proper decryption
+const decryptSabpaisa = (encryptedData) => {
+  try {
+    // Validate and prepare key
+    let authKey = SABPAISA_AUTH_KEY;
+    if (!authKey || authKey.length === 0) {
+      throw new Error("SABPAISA_AUTH_KEY not configured");
+    }
+    const key = Buffer.from(authKey, "hex");
+
+    // Validate and prepare IV
+    let authIV = SABPAISA_AUTH_IV;
+    if (!authIV || authIV.length === 0) {
+      throw new Error("SABPAISA_AUTH_IV not configured");
+    }
+    const iv = Buffer.from(authIV, "hex");
+
+    // Create decipher
+    const decipher = crypto.createDecipheriv("aes-256-cbc", key, iv);
+
+    // Decrypt data
+    let decrypted = decipher.update(encryptedData, "hex", "utf8");
+    decrypted += decipher.final("utf8");
+
+    return JSON.parse(decrypted);
+  } catch (error) {
+    console.error("❌ Decryption error:", error.message);
+    throw new Error(`Decryption failed: ${error.message}`);
+  }
+};
+
+// ============================================
+// 1. CREATE SABPAISA ORDER (FIXED)
+// ============================================
+const createSabpaisaOrder = async (req, res) => {
+  let orderId = null;
+
+  try {
+    // ✅ Verify authentication
+    if (!req.user || !req.user.id) {
+      return res.status(401).json({
+        success: false,
+        message: "Authentication required",
+      });
+    }
+
+    // ✅ Verify Sabpaisa is configured
+    if (!SABPAISA_CLIENT_CODE || !SABPAISA_AUTH_KEY || !SABPAISA_AUTH_IV) {
+      return res.status(500).json({
+        success: false,
+        message: "Sabpaisa payment gateway not properly configured",
+      });
+    }
+
+    // ✅ Validate input
+    const { orderData, amount, customerDetails } = req.body;
+
+    if (!orderData || !amount || !customerDetails) {
+      return res.status(400).json({
+        success: false,
+        message: "Missing required payment data",
+      });
+    }
+
+    // ✅ Validate amount
+    validateAmount(amount);
+
+    // ✅ Validate phone
+    const cleanPhone = validateAndCleanPhone(customerDetails.phone);
+
+    // ✅ Validate shipping address
+    validateShippingAddress(orderData.shippingAddress);
+
+    // ✅ Create order in database
+    const newOrder = new Order({
+      user: new mongoose.Types.ObjectId(req.user.id),
+      orderItems: orderData.orderItems.map((item) => ({
+        product: item.product || null,
+        name: item.name,
+        quantity: item.quantity,
+        size: item.size,
+        color: item.color,
+        price: item.price,
+        image: item.image,
+      })),
+      shippingAddress: orderData.shippingAddress,
+      paymentMethod: "SABPAISA",
+      orderStatus: "pending",
+      paymentStatus: "pending",
+      totalPrice: amount,
+      shippingPrice: orderData.shippingPrice || 0,
+      taxPrice: orderData.taxPrice || 0,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    const savedOrder = await newOrder.save();
+    orderId = savedOrder._id;
+
+    console.log("✅ Sabpaisa order created in DB:", savedOrder._id);
+
+    // ✅ Generate Sabpaisa order ID
+    const sabpaisaOrderId = generateSabpaisaOrderId();
+
+    // ✅ Prepare payment request
+    const paymentRequest = {
+      clientCode: SABPAISA_CLIENT_CODE,
+      transactionId: sabpaisaOrderId,
+      amount: parseFloat(amount).toFixed(2),
+      currency: "INR",
+      mcc: SABPAISA_MCC,
+      channelId: SABPAISA_CHANNEL_ID,
+      customerName: customerDetails.name,
+      customerEmail: customerDetails.email,
+      customerPhone: cleanPhone,
+      description: `Order #${savedOrder._id.toString().slice(-6)}`,
+      returnUrl: `${SABPAISA_CALLBACK_URL}/payment-status?orderId=${savedOrder._id}&gateway=sabpaisa`,
+      notifyUrl: `${process.env.REACT_APP_API_URL}/api/payment/sabpaisa/webhook`,
+    };
+
+    console.log("📤 Creating Sabpaisa payment request:", sabpaisaOrderId);
+
+    // ✅ Encrypt payment request
+    const encryptedRequest = encryptSabpaisa(paymentRequest);
+
+    // ✅ Update order with Sabpaisa details
+    await Order.findByIdAndUpdate(savedOrder._id, {
+      sabpaisaOrderId: sabpaisaOrderId,
+      paymentSessionId: sabpaisaOrderId,
+    });
+
+    // ✅ Create Base64 encoded request
+    const encodedRequest = Buffer.from(encryptedRequest).toString("base64");
+
+    console.log("✅ Sabpaisa order created successfully");
+
+    res.json({
+      success: true,
+      message: "Order created successfully",
+      orderId: savedOrder._id,
+      sabpaisaOrderId: sabpaisaOrderId,
+      gateway: "sabpaisa",
+      paymentUrl: `${SABPAISA_API_URL}/payment/gateway`,
+      paymentData: {
+        clientCode: SABPAISA_CLIENT_CODE,
+        username: SABPAISA_TRANS_USERNAME,
+        encryptedData: encodedRequest,
+        returnUrl: `${SABPAISA_CALLBACK_URL}/payment-status?orderId=${savedOrder._id}&gateway=sabpaisa`,
+      },
+    });
+  } catch (error) {
+    console.error("❌ Create Sabpaisa order error:", error.message);
+
+    if (orderId) {
+      await Order.findByIdAndDelete(orderId).catch((e) =>
+        console.error("Cleanup error:", e)
+      );
+    }
+
+    res.status(500).json({
+      success: false,
+      message: error.message || "Failed to create order",
+    });
+  }
+};
+
+// ============================================
+// 2. VERIFY SABPAISA PAYMENT (UPDATED)
+// ============================================
+const verifySabpaisaPayment = async (req, res) => {
+  try {
+    const { orderId } = req.params;
+
+    // ✅ Verify authentication
+    if (!req.user || !req.user.id) {
+      return res.status(401).json({
+        success: false,
+        message: "Authentication required",
+      });
+    }
+
+    // ✅ Validate orderId
+    if (!mongoose.Types.ObjectId.isValid(orderId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid order ID",
+      });
+    }
+
+    // ✅ Find order
+    const order = await Order.findOne({
+      _id: orderId,
+      user: req.user.id,
+    });
+
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: "Order not found or access denied",
+      });
+    }
+
+    if (!order.sabpaisaOrderId) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid order - no payment reference found",
+      });
+    }
+
+    console.log("🔍 Verifying Sabpaisa payment for order:", orderId);
+
+    // ✅ Check order payment status
+    if (order.paymentStatus === "pending") {
+      console.log("⏳ Payment verification pending webhook callback");
+
+      res.json({
+        success: true,
+        paymentStatus: "PENDING",
+        orderStatus: "pending",
+        message: "Payment is being processed. Please wait for confirmation.",
+      });
+    } else if (order.paymentStatus === "completed") {
+      console.log("✅ PAYMENT VERIFIED!");
+
+      res.json({
+        success: true,
+        paymentStatus: "SUCCESS",
+        orderStatus: "Order Placed",
+        order: order,
+        message: "Payment verified successfully",
+      });
+    } else if (order.paymentStatus === "failed") {
+      console.log("❌ PAYMENT FAILED!");
+
+      res.json({
+        success: true,
+        paymentStatus: "FAILED",
+        orderStatus: "cancelled",
+        message: "Payment failed. Please try again.",
+      });
+    }
+  } catch (error) {
+    console.error("❌ Payment verification error:", error.message);
+
+    res.status(500).json({
+      success: false,
+      message: error.message || "Payment verification failed",
+    });
+  }
+};
+
+// ============================================
+// 3. SABPAISA WEBHOOK HANDLER (UPDATED)
+// ============================================
+const handleSabpaisaWebhook = async (req, res) => {
+  try {
+    console.log("🔔 Webhook received from Sabpaisa");
+
+    // ✅ Extract encrypted data from webhook
+    const { encryptedData } = req.body;
+
+    if (!encryptedData) {
+      console.error("❌ No encrypted data in webhook");
+      return res.status(400).json({
+        success: false,
+        message: "Invalid webhook data",
+      });
+    }
+
+    // ✅ Decrypt webhook data
+    const webhookData = decryptSabpaisa(encryptedData);
+    console.log("✅ Webhook data decrypted:", webhookData);
+
+    const { transactionId, status, amount, responseCode } = webhookData;
+
+    if (!transactionId || !status) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid webhook data",
+      });
+    }
+
+    // ✅ Find order by sabpaisaOrderId
+    const order = await Order.findOne({ sabpaisaOrderId: transactionId });
+
+    if (!order) {
+      console.warn("⚠️ Order not found for webhook:", transactionId);
+      return res.status(404).json({
+        success: false,
+        message: "Order not found",
+      });
+    }
+
+    console.log(`📊 Sabpaisa webhook status: ${status}`);
+
+    // ✅ PAYMENT SUCCESS
+    if (
+      status === "SUCCESS" ||
+      status === "CAPTURED" ||
+      responseCode === "00"
+    ) {
+      console.log("✅ Payment successful via webhook!");
+
+      await Order.findByIdAndUpdate(order._id, {
+        paymentStatus: "completed",
+        orderStatus: "Order Placed",
+        paidAt: new Date(),
+        sabpaisaPaymentId: transactionId,
+        paymentMethodName: "SABPAISA",
+        paymentAmount: amount,
+        $push: {
+          statusHistory: {
+            status: "Order Placed",
+            updatedBy: null,
+            updatedByName: "System (Webhook)",
+            updatedByRole: "system",
+            timestamp: new Date(),
+            reason: "Payment confirmed via Sabpaisa webhook",
+          },
+        },
+      });
+
+      console.log("✅ Order updated - Payment confirmed");
+    }
+    // ✅ PAYMENT FAILED
+    else if (
+      status === "FAILED" ||
+      status === "DECLINED" ||
+      responseCode !== "00"
+    ) {
+      console.log("❌ Payment failed via webhook");
+
+      await Order.findByIdAndUpdate(order._id, {
+        paymentStatus: "failed",
+        orderStatus: "cancelled",
+        failureReason: `Payment ${status} (${responseCode}) via Sabpaisa`,
+        $push: {
+          statusHistory: {
+            status: "cancelled",
+            updatedBy: null,
+            updatedByName: "System (Webhook)",
+            updatedByRole: "system",
+            timestamp: new Date(),
+            reason: `Payment ${status}`,
+          },
+        },
+      });
+
+      console.log("✅ Order updated - Payment failed");
+    }
+
+    // ✅ Always respond with success
+    res.json({
+      success: true,
+      message: "Webhook processed successfully",
+    });
+  } catch (error) {
+    console.error("❌ Webhook processing error:", error);
+
+    // ✅ Still respond with success
+    res.json({
+      success: true,
+      message: "Webhook processed",
+    });
+  }
+};
+
+// ============================================
+// 4. GET SABPAISA PAYMENT STATUS (UNCHANGED)
+// ============================================
+const getSabpaisaPaymentStatus = async (req, res) => {
+  try {
+    const { orderId } = req.params;
+
+    if (!req.user || !req.user.id) {
+      return res.status(401).json({
+        success: false,
+        message: "Authentication required",
+      });
+    }
+
+    const order = await Order.findOne({
+      _id: orderId,
+      user: req.user.id,
+    });
+
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: "Order not found",
+      });
+    }
+
+    res.json({
+      success: true,
+      order: {
+        id: order._id,
+        paymentStatus: order.paymentStatus,
+        orderStatus: order.orderStatus,
+        amount: order.totalPrice,
+        createdAt: order.createdAt,
+        paidAt: order.paidAt,
+        sabpaisaOrderId: order.sabpaisaOrderId,
+        sabpaisaPaymentId: order.sabpaisaPaymentId,
+      },
+    });
+  } catch (error) {
+    console.error("❌ Status check error:", error);
+
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch order status",
+    });
+  }
+};
+
 module.exports = {
   createCashfreeOrder,
   verifyCashfreePayment,
   getCashfreePaymentStatus,
   handleCashfreeWebhook,
   createCODOrder,
+  // New Sabpaisa exports
+  createSabpaisaOrder,
+  verifySabpaisaPayment,
+  getSabpaisaPaymentStatus,
+  handleSabpaisaWebhook,
 };

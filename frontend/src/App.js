@@ -39,6 +39,7 @@ import DeliveryBoyDashboard from "./pages/deliveryboy/DeliveryBoyDashboard";
 import { ProtectedRoute } from "./pages/ProtectedRoute";
 import DeliveryBoyManagement from "./pages/admin/DeliveryBoyManagement";
 import PaymentStatus from "./pages/PaymentStatus";
+import SabPaisaPaymentForm from "./pages/SabPaisaPaymentForm";
 // Styles
 import "./styles/global.css";
 
@@ -69,6 +70,10 @@ function App() {
                 <Route path="/privacy" element={<PrivacyPolicy />} />
                 <Route path="/about" element={<About />} />
                 <Route path="/payment-status" element={<PaymentStatus />} />
+                <Route
+                  path="/sabpaisa-payment"
+                  element={<SabPaisaPaymentForm />}
+                />
                 <Route
                   path="/order-success/:orderId"
                   element={<OrderSuccess />}

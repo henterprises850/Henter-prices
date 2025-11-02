@@ -24,26 +24,34 @@ const Checkout = () => {
   const [paymentMethod, setPaymentMethod] = useState("COD");
   const [loading, setLoading] = useState(false);
   const [cashfree, setCashfree] = useState(null);
+  const [sabpaisa, setSabpaisa] = useState(null);
 
+  // Update useEffect
   useEffect(() => {
     if (cartItems.length === 0) {
       toast.warning("Your cart is empty");
       navigate("/cart");
       return;
     }
-    initializeCashfree();
+    initializePaymentGateways();
   }, [cartItems, navigate]);
 
-  const initializeCashfree = async () => {
+  // Update initializeCashfree to initializePaymentGateways
+  const initializePaymentGateways = async () => {
     try {
+      // ✅ Initialize Cashfree
       const cashfreeInstance = await load({
         mode: process.env.REACT_APP_CASHFREE_MODE || "sandbox",
       });
       setCashfree(cashfreeInstance);
       console.log("✅ Cashfree initialized");
+
+      // ✅ Initialize Sabpaisa (just set flag for now)
+      setSabpaisa(true);
+      console.log("✅ Sabpaisa initialized");
     } catch (error) {
-      console.error("❌ Cashfree initialization failed:", error);
-      toast.error("Payment system unavailable. Using COD only.");
+      console.error("❌ Payment gateway initialization failed:", error);
+      toast.error("Payment system initialization failed");
     }
   };
 
@@ -164,6 +172,87 @@ const Checkout = () => {
     }
   };
 
+  const handleSabpaisaPayment = async () => {
+    try {
+      if (!validateShippingAddress()) {
+        toast.error("Please fill in all shipping address fields");
+        return;
+      }
+
+      setLoading(true);
+      toast.info("Creating payment order...");
+
+      const orderData = {
+        orderItems: cartItems.map((item) => ({
+          product: item._id,
+          name: item.name,
+          quantity: item.quantity,
+          size: item.selectedSize,
+          color: item.selectedColor,
+          price: item.price,
+          image: item.images[0],
+        })),
+        shippingAddress,
+        shippingPrice: 0,
+        taxPrice: 0,
+      };
+
+      // ✅ Create Sabpaisa order
+      const createResponse = await axios.post(
+        `${process.env.REACT_APP_API_URL}/api/payment/sabpaisa/create-order`,
+        {
+          orderData,
+          amount: total,
+          customerDetails: {
+            name: shippingAddress.fullName,
+            email: shippingAddress.email,
+            phone: shippingAddress.phone,
+          },
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+          timeout: 15000,
+        }
+      );
+
+      if (!createResponse.data.success) {
+        throw new Error(createResponse.data.message);
+      }
+
+      const { orderId, paymentUrl, paymentData } = createResponse.data;
+
+      console.log("✅ Sabpaisa order created:", orderId);
+      toast.success("Redirecting to Sabpaisa payment...");
+
+      // ✅ Create form and submit to Sabpaisa
+      const sabpaisaForm = document.createElement("form");
+      sabpaisaForm.method = "POST";
+      sabpaisaForm.action = paymentUrl;
+      sabpaisaForm.target = "_self";
+
+      // Add payment data fields
+      Object.keys(paymentData).forEach((key) => {
+        const input = document.createElement("input");
+        input.type = "hidden";
+        input.name = key;
+        input.value = paymentData[key];
+        sabpaisaForm.appendChild(input);
+      });
+
+      document.body.appendChild(sabpaisaForm);
+      sabpaisaForm.submit();
+      document.body.removeChild(sabpaisaForm);
+    } catch (error) {
+      console.error("❌ Sabpaisa payment error:", error);
+      setLoading(false);
+      toast.error(
+        error.response?.data?.message || "Payment initialization failed"
+      );
+    }
+  };
+
   // ✅ COD Order Handler
   const handleCODOrder = async () => {
     try {
@@ -219,6 +308,7 @@ const Checkout = () => {
     }
   };
 
+  // Update handleSubmit
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -226,6 +316,8 @@ const Checkout = () => {
       await handleCODOrder();
     } else if (paymentMethod === "CASHFREE") {
       await handleCashfreePayment();
+    } else if (paymentMethod === "SABPAISA") {
+      await handleSabpaisaPayment();
     }
   };
 
@@ -385,6 +477,31 @@ const Checkout = () => {
                     </label>
                   </div>
                 </div>
+                {/* <div className="flex items-center">
+                  <input
+                    id="sabpaisa"
+                    name="paymentMethod"
+                    type="radio"
+                    value="SABPAISA"
+                    checked={paymentMethod === "SABPAISA"}
+                    onChange={(e) => setPaymentMethod(e.target.value)}
+                    className="h-4 w-4 text-blue-600"
+                  />
+                  <label
+                    htmlFor="sabpaisa"
+                    className="ml-3 block text-sm font-medium text-gray-700"
+                  >
+                    💳 Sabpaisa Payment (UPI, Cards, Wallets)
+                  </label>
+                </div> */}
+
+                {/* {paymentMethod === "SABPAISA" && (
+                  <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-md">
+                    <p className="text-sm text-blue-800">
+                      🔒 Fast & Secure payment powered by Sabpaisa
+                    </p>
+                  </div>
+                )} */}
 
                 {paymentMethod === "CASHFREE" && (
                   <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-md">
@@ -406,7 +523,9 @@ const Checkout = () => {
               <button
                 type="submit"
                 disabled={
-                  loading || (paymentMethod === "CASHFREE" && !cashfree)
+                  loading ||
+                  (paymentMethod === "CASHFREE" && !cashfree) ||
+                  (paymentMethod === "SABPAISA" && !sabpaisa)
                 }
                 className="w-full bg-blue-600 text-white py-3 px-4 rounded-md font-semibold hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center"
               >
@@ -436,6 +555,8 @@ const Checkout = () => {
                   </>
                 ) : paymentMethod === "CASHFREE" ? (
                   `Pay ₹${total.toLocaleString()} - Secure Payment`
+                ) : paymentMethod === "SABPAISA" ? (
+                  `Pay ₹${total} - Sabpaisa`
                 ) : (
                   `Place Order - ₹${total.toLocaleString()}`
                 )}
@@ -476,14 +597,7 @@ const Checkout = () => {
                 <span>Subtotal</span>
                 <span>₹{subtotal.toLocaleString()}</span>
               </div>
-              <div className="flex justify-between mb-2">
-                <span>Shipping</span>
-                <span className="text-green-600">Free</span>
-              </div>
-              <div className="flex justify-between mb-2">
-                <span>Tax (GST)</span>
-                <span>₹0</span>
-              </div>
+
               <div className="border-t pt-2 flex justify-between text-lg font-bold">
                 <span>Total</span>
                 <span className="text-green-600">

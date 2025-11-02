@@ -185,18 +185,18 @@ const Cart = () => {
                   <span className="text-gray-600">Subtotal</span>
                   <span className="font-medium">₹{getCartTotal()}</span>
                 </div>
-                <div className="flex justify-between">
+                {/* <div className="flex justify-between">
                   <span className="text-gray-600">Shipping</span>
                   <span className="font-medium">
                     {calculateShipping() === 0
                       ? "Free"
                       : `₹${calculateShipping()}`}
                   </span>
-                </div>
-                <div className="flex justify-between">
+                </div> */}
+                {/* <div className="flex justify-between">
                   <span className="text-gray-600">Tax (GST)</span>
                   <span className="font-medium">₹{calculateTax()}</span>
-                </div>
+                </div> */}
                 <div className="border-t pt-4">
                   <div className="flex justify-between text-lg font-bold">
                     <span>Total</span>
@@ -211,26 +211,6 @@ const Cart = () => {
               >
                 Proceed to Checkout
               </button>
-
-              {/* Free Shipping Banner */}
-              {getCartTotal() < 999 && (
-                <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
-                  <p className="text-sm text-yellow-800">
-                    Add ₹{999 - getCartTotal()} more to get free shipping!
-                  </p>
-                  <div className="w-full bg-yellow-200 rounded-full h-2 mt-2">
-                    <div
-                      className="bg-yellow-500 h-2 rounded-full transition-all duration-300"
-                      style={{
-                        width: `${Math.min(
-                          (getCartTotal() / 999) * 100,
-                          100
-                        )}%`,
-                      }}
-                    ></div>
-                  </div>
-                </div>
-              )}
 
               {/* Security Features */}
               <div className="mt-6 space-y-3 text-sm text-gray-600">
@@ -248,20 +228,7 @@ const Cart = () => {
                   </svg>
                   Secure checkout
                 </div>
-                <div className="flex items-center">
-                  <svg
-                    className="w-4 h-4 mr-2 text-green-500"
-                    fill="currentColor"
-                    viewBox="0 0 20 20"
-                  >
-                    <path
-                      fillRule="evenodd"
-                      d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                      clipRule="evenodd"
-                    />
-                  </svg>
-                  30-day return policy
-                </div>
+
                 <div className="flex items-center">
                   <svg
                     className="w-4 h-4 mr-2 text-green-500"
